@@ -1,0 +1,22 @@
+{
+    "files":{
+        "../.gitignore": ".gitignore",
+        "../0-begin.tex": "0-begin.tex",
+        "../0-bib.tex": "0-bib.tex",
+        "../0-documentclass.tex": "0-documentclass.tex",
+        "../0-index.tex": "0-index.tex",
+        "../0-post.tex": "0-post.tex",
+        "../check_qr_code_locations.py": "check_qr_code_locations.py",
+        "../dictionary": "dictionary",
+        "../install-getnonfreefonts": "install-getnonfreefonts",
+        "../latexmkrc": "latexmkrc",
+        "../latexmkrc_main": "latexmkrc_main",
+        "../latexmkrc_solutions": "latexmkrc_solutions",
+        "../Makefile": "Makefile",
+        "../new-versionless-text.py": "new-versionless-text.py",
+        "../requirements.txt": "requirements.txt"
+    },
+    "directories":{
+        "../scripts": "scripts"
+    }
+}

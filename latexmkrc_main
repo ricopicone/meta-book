@@ -1,0 +1,1 @@
+$makeindex = 'makeindex -l %S -s common/styles-tex/index_style.ist';
