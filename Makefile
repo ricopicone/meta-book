@@ -72,7 +72,9 @@ lua_filters = $(shell find ./common/lua-filters -type f -name '*Makefile') # thi
 engcom_makes = $(shell find ./source/engcom -type f -name '*Makefile')
 source_makes = $(shell find ./source -type f -name '*Makefile')
 statemint_makes = $(shell find ./source/StateMint -type f -name '*Makefile')
-nosubmakes = $(lua_filters) $(engcom_makes) $(statemint_makes) $(source_makes)
+meta_book_makes = $(shell find ./meta-book -type f -name '*Makefile')
+meta_common_makes = $(shell find ./common/meta-common -type f -name '*Makefile')
+nosubmakes = $(lua_filters) $(engcom_makes) $(statemint_makes) $(source_makes) $(meta_book_makes) $(meta_common_makes)
 submakefiles = $(filter-out $(nosubmakes), $(shell find . -mindepth 2 -type f -not -path './common/source/matlab/matlab2tikz/*' -not -path './common/lua-filters'  -not -path './exams' -name '*Makefile'))
 $(info $$submakefiles is [${submakefiles}])
 index_see_entries = ./scripts/index-see-entries.tex
@@ -175,7 +177,7 @@ thumbnails: split/thumbnails thumbnail_single
 
 split/thumbnails: split/partial
 	mkdir -p $@
-	trash $@/*
+	-$(trash) $@/*
 	$(MAKE) $(patsubst $</%.pdf, $@/%.jpg, $(wildcard $</*.pdf))
 
 split/thumbnails/$(tex_default)_%.jpg: split/partial/$(tex_default)_%.pdf
@@ -188,29 +190,21 @@ thumbnail_single: $(tex_default)_partial.pdf
 # COPY FILES TO WEBSITE =======
 website: $(tex_default)_partial.pdf split/partial thumbnails
 # 	$(MAKE) $(<:pdf=jpg) $(patsubst %.pdf, %.jpg, $(wildcard $(word 2, $^)*.pdf))
-	trash ../mathematical_foundations/*.pdf
-	trash ../mathematical_foundations/*.jpg
-	cp $(tex_default)_partial.pdf ../mathematical_foundations
-	cp split/partial/*.pdf ../mathematical_foundations
-	cp split/thumbnails/*.jpg ../mathematical_foundations
+	-$(trash) $(commondir)/split/partial/*.pdf
+	-$(trash) $(commondir)/split/partial/*.jpg
+	cp $(tex_default)_partial.pdf $(commondir)/split/partial
+	cp split/partial/*.pdf $(commondir)/split/partial
+	cp split/thumbnails/*.jpg $(commondir)/split/partial
 
 # OTHER ===============
 
+$(commondir)/source_dependencies.mk: $(commondir)/source-dependencies.json
+	python $(commondir)/scripts/source_dependencies_rule_writer.py $(commondir)/source-dependencies.json $(commondir)/source_dependencies.mk
+
+$(commondir)/source-dependencies.json:
+
 include $(commondir)/common.mk
-common/versioned/iu/index.tex: source/central-limit-theorem/main.py source/central-limit-theorem/main.md
-common/versioned/2l/index.tex: source/regression/main.py source/regression/main.md
-common/versioned/1l/index.tex: source/div-surface-integrals-flux/main.py source/div-surface-integrals-flux/main.md
-common/versioned/yk/index.tex: source/curl-and-line-integrals/main.py source/curl-and-line-integrals/main.md
-common/versioned/4j/index.tex: source/grad/main.py source/grad/main.md
-common/versioned/sr/index.tex: source/skyfall/main.py source/skyfall/main.md
-common/versioned/0j/index.tex: source/fourier-series-to-transform/main.py source/fourier-series-to-transform/main.md
-common/versioned/y7/index.tex: source/gradient-descent/main.py source/gradient-descent/main.md
-common/versioned/mt/index.tex: source/simplex-linear-programming/main.py source/simplex-linear-programming/main.md
-common/versioned/2h/index.tex: source/eigenfunctions-example/main.py source/eigenfunctions-example/main.md
-common/versioned/an/index.tex: source/pde-separation-example-01/main.py source/pde-separation-example-01/main.md
-common/versioned/2i/index.tex: source/pde-separation-example-02/main.py source/pde-separation-example-02/main.md
-common/versioned/pw/index.tex: source/horcrux/main.py source/horcrux/main.md
-common/versioned/9z/index.tex: source/binomial-pdf/main.py source/binomial-pdf/main.md
+include $(commondir)/source_dependencies.mk
 
 versionless-tex: $(versionless_targets_tex)
 
