@@ -61,6 +61,8 @@ lecture_numbers_f=$(SED '/subsection/d' "$inname".toc | \
   SED 's/section\.//' | \
   SED 's/}//' ) # parse .toc for section numbers (works for acronym sections!)
 
+echo "${lecture_numbers_f[*]}"
+
 # lecture_numbers_f_clean=$(echo "${lecture_numbers_f}" | \
 #     SED 's/\./_/g' )
 
@@ -141,17 +143,18 @@ for i in "${!lecture_names[@]}"; do
   let "j++" # increment lecture index counter
 done
 
-for i in "${!lecture_numbers_clean[@]}"; do
-  cha=$(echo ${lecture_numbers[$i]} | cut -f1 -d.)
-  sec=$(echo ${lecture_numbers[$i]} | cut -f2 -d.)
-  # echo "Chapter: $cha"
-  # echo "Section: $sec"
-  if [[ $cha == [A-Z] ]] ; then
-    lecture_numbers_clean[$i]=$(printf "%s-%02d" ${cha} ${sec})
-  else
-    lecture_numbers_clean[$i]=$(printf "%02d-%02d" ${cha} ${sec})
-  fi
-done
+# Zero pad lecture numbers
+# for i in "${!lecture_numbers_clean[@]}"; do
+#   cha=$(echo ${lecture_numbers[$i]} | cut -f1 -d.)
+#   sec=$(echo ${lecture_numbers[$i]} | cut -f2 -d.)
+#   # echo "Chapter: $cha"
+#   # echo "Section: $sec"
+#   if [[ $cha == [A-Z] ]] ; then
+#     lecture_numbers_clean[$i]=$(printf "%s-%02d" ${cha} ${sec})
+#   else
+#     lecture_numbers_clean[$i]=$(printf "%02d-%02d" ${cha} ${sec})
+#   fi
+# done
 
 # echo "Lecture numbers clean: ${lecture_numbers_clean[*]}"
 # exit 0
@@ -172,6 +175,6 @@ for i in ${!lecture_page_numbers[@]}; do
   # echo "cat $a-$b"
   # echo "${wdir}/${splitdir}/${outputprefix}"_"${lecture_numbers_clean[$i]}"_"${lecture_acronyms_clean[$i]}"_"${lecture_names_clean[$i]}".pdf
   # pdftk "$infile" cat $a-$b output "${wdir}/${splitdir}/${outputprefix}"_"${lecture_numbers_clean[$i]}"_"${lecture_acronyms_clean[$i]}"_"${lecture_names_clean[$i]}".pdf
-  echo "${wdir}/${splitdir}/${outputprefix}"_"${lecture_numbers_clean[$i]}"_"${lecture_names_clean[$i]}".pdf
-  pdftk "$infile" cat $a-$b output "${wdir}/${splitdir}/${outputprefix}"_"${lecture_numbers_clean[$i]}"_"${lecture_names_clean[$i]}".pdf
+  echo "${wdir}/${splitdir}/${outputprefix}/${lecture_numbers_clean[$i]}".pdf
+  pdftk "$infile" cat $a-$b output "${wdir}/${splitdir}/${outputprefix}/${lecture_numbers_clean[$i]}".pdf
 done

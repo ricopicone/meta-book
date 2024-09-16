@@ -134,11 +134,13 @@ partial_full: split/full
 
 # Splits the partial document (requires .toc file)
 split/partial: $(tex_default)_partial.pdf
-	./scripts/split_pdf_at_bookmarks.sh $< partial/$(tex_default)_partial split
+	-$(trash) split/partial/*
+	./scripts/split_pdf_at_bookmarks.sh $< partial split
 
 # Splits the full document (requires .toc file)
 split/full: $(tex_default).pdf
-	./scripts/split_pdf_at_bookmarks.sh $< full/$(tex_default) split
+	-$(trash) split/full/*
+	./scripts/split_pdf_at_bookmarks.sh $< full split
 
 split: split_partial split_full
 
@@ -168,6 +170,7 @@ split/sewn: split/outlined
 # Sew split outlined partial pages
 split/sewn/$(tex_default)_%.pdf: split/outlined/$(tex_default)_%.pdf
 	mkdir -p $(dir $@)
+	-(trash) $(dir $@)/*
 	./scripts/pdfjam_sew.sh $< $@
 
 # GENERATE THUMBNAILS =======
@@ -180,7 +183,7 @@ split/thumbnails: split/partial
 	-$(trash) $@/*
 	$(MAKE) $(patsubst $</%.pdf, $@/%.jpg, $(wildcard $</*.pdf))
 
-split/thumbnails/$(tex_default)_%.jpg: split/partial/$(tex_default)_%.pdf
+split/thumbnails/%.jpg: split/partial/%.pdf
 	gs -dNOPAUSE -dBATCH -sDEVICE=jpeg -r300 -sOutputFile="$@" -dLastPage=1 "$<"
 
 # Make single (whole) document thumbnail
