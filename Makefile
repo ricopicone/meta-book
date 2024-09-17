@@ -265,8 +265,9 @@ solutions-manuals/%.pdf: solutions-manuals/%.tex $(versionless_targets_tex) $(ve
 	-$(call tex_cmd,$(solution_text))
 	cp $@ ./solutions-manuals/solutions-manuals-repo/
 
-./scripts/index-see-entries.tex: ./scripts/generate-see-index-entries.py # this also contains the dict with the entries
-	cd "./scripts"; python "./generate-see-index-entries.py"
+# Build the "see" index entries
+./scripts/index-see-entries.tex: ./scripts/generate-see-index-entries.py ./scripts/see-index-entries.json
+	python ./scripts/generate-see-index-entries.py ./scripts/see-index-entries.json $@	
 
 # The all target builds everything
 all: full partial split_partial partial_sewn solutions assignment_solutions exams versioned-tex
@@ -284,3 +285,9 @@ convert_chapter:
 split_converted_chapter:
 	@echo "Splitting $(ch)..."
 	@python scripts/converted_markdown_split.py $(ch)
+
+# Sample
+sample:
+	convert -size 612x792 -pointsize 16 -gravity center label:"This is a sample.\nThe number of pages available is limited." removed.pdf
+	pdftk B=$(tex_default).pdf R=removed.pdf cat $(shell python sample_pages.py) output sample.pdf owner_pw MRFM user_pw RTC_Book
+	rm removed.pdf
