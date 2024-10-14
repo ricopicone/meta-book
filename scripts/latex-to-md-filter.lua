@@ -77,10 +77,38 @@ local function strip_environment(el,env)
 end
 
 local function strip_environment_opts(el,env)
-  local el_text = el.text:match("\\begin{" .. env .. "}[.-](.-)\\end{" .. env .. "}")
+  local el_text = el.text:match("\\begin{" .. env .. "}%[.-%](.-)\\end{" .. env .. "}") -- this is giving nil
   local el_read = pandoc.read(el_text,'latex+raw_tex').blocks
   return el_read
 end
+
+-- local function strip_environment_mismatched(el,env1,env2)
+--   local el_text = el.text:match("\\begin{" .. env1 .. "}(.-)\\end{" .. env2 .. "}")
+--   -- Make the second part, after the begin{env2} to the end of the text, a separate text
+--   local el_text2 = el_text:match("\\begin{" .. env2 .. "}(.-)$")
+--   -- Make the first part, from the beginning of the text to end{env1} a separate text
+--   local el_text1 = el_text:match("^(.-)\\end{" .. env1 .. "}")
+--   -- Read the first part as a block
+--   local el_read1 = pandoc.read(el_text1,'latex+raw_tex').blocks
+--   -- Read the second part as a block
+--   local el_read2 = pandoc.read(el_text2,'latex+raw_tex').blocks
+--   -- Return both blocks
+--   return el_read1,el_read2
+-- end
+
+-- local function strip_environment_mismatched_opts(el,env1,env2)
+--   local el_text = el.text:match("\\begin{" .. env1 .. "}%[.-%](.-)\\end{" .. env2 .. "}")
+--   -- Make the second part, after the begin{env2} to the end of the text, a separate text
+--   local el_text2 = el_text:match("\\begin{" .. env2 .. "}(.-)$")
+--   -- Make the first part, from the beginning of the text to end{env1} a separate text
+--   local el_text1 = el_text:match("^(.-)\\end{" .. env1 .. "}")
+--   -- Read the first part as a block
+--   local el_read1 = pandoc.read(el_text1,'latex+raw_tex').blocks
+--   -- Read the second part as a block
+--   local el_read2 = pandoc.read(el_text2,'latex+raw_tex').blocks
+--   -- Return both blocks
+--   return el_read1,el_read2
+-- end
 
 local function starts_with(start, str)
   return str:sub(1, #start) == start
@@ -217,8 +245,10 @@ local function replace_infobox(el)
 end
 
 local function replace_exercise(el)
+  -- Extract the ID attribute from the exercise environment
+  local id
   local id1 = el.text:match("ID=(.-),")
-  local id2 = el.text:match("ID=(.-)]")
+  local id2 = el.text:match("ID=(.-)%]")
   if id1 == nil and id2 == nil then
     id = "IDME"
   elseif id1 == nil then
@@ -226,39 +256,42 @@ local function replace_exercise(el)
   elseif id2 == nil then
     id = id1
   else
-    id = "IDME"
+    id = id1  -- Take the first one (the one before the comma)
   end
+  local exercise
   if el.text:match("\\begin{exercise}%[") == nil then
-    local el_s = strip_environment(el,'exercise')
+    exercise = strip_environment(el,'exercise')
   else
-    local el_s = strip_environment_opts(el,'exercise')
-  end --- this sometimes gives nil ... it's in the pandoc.read of strip_environment but I can't find the bug .. that's why the "or" below
-  local contents = pandoc.Div(
-      el_s or pandoc.RawBlock('latex',el.text:match("\\begin{exercise}(.-)\\end{exercise}")),
-      {'exercise_contents'}
-    )
-  return pandoc.Div(
-    {
-      pandoc.Div(pandoc.Para('Exercise'),{'exercise_title'}),
-      contents
-    },
+    exercise = strip_environment_opts(el,'exercise')
+  end
+  local exercise_div = pandoc.Div(
+    exercise,
     {id,{'exercise'}}
   )
+  exercise_div.attributes['h'] = id
+  -- Turn into a raw markdown block
+  local exercise_div_raw = pandoc.write(pandoc.Pandoc(exercise_div), "markdown")
+  --- Remove the last occurrence of :::
+  exercise_div_raw = exercise_div_raw:gsub("(.*):::","%1")
+  return pandoc.RawBlock('markdown',exercise_div_raw)
 end
 
 local function replace_solution(el)
-  local el_s = strip_environment(el,'solution')
-  local contents = pandoc.Div(
-      el_s or pandoc.Para('solution did not convert'),
-      {'solution_contents'}
-    )
-  return pandoc.Div(
-    {
-      pandoc.Div(pandoc.Para('Solution'),{'solution_title'}),
-      contents
-    },
-    {'labelme',{'solution'}}
+  local solution
+  if el.text:match("\\begin{solution}%[") == nil then
+    solution = strip_environment(el,'solution')
+  else
+    solution = strip_environment_opts(el,'solution')
+  end
+  local solution_div = pandoc.Div(
+    solution,
+    {class='exercise-solution'}
   )
+  -- Turn into a raw markdown block
+  local solution_div_raw = pandoc.write(pandoc.Pandoc(solution_div), "markdown")
+  --- Append a closing ::: to the end
+  solution_div_raw = solution_div_raw .. "\n:::"
+  return pandoc.RawBlock('markdown',solution_div_raw)
 end
 
 local function replace_subfile(el)

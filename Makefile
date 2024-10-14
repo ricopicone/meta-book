@@ -258,7 +258,7 @@ build-sections/%.pdf: build-sections/%.tex
 # build a solutions manual
 trashaux = "false" # default don't trash aux files
 solution: $(shell find common -name *.md) $(shell find common/versionless -name *.md) $(shell find source -name *.md)
-	make "solutions-manuals/math-solutions-manual-0/math-solutions-manual-0.pdf" # default
+	make "solutions-manuals/systems-solutions-manual-0/systems-solutions-manual-0.pdf" # default
 
 solutions-manuals/%.pdf: solutions-manuals/%.tex $(versionless_targets_tex) $(versioned_targets_tex)
 	$(eval options+= -norc -r latexmkrc_solutions)
@@ -267,7 +267,7 @@ solutions-manuals/%.pdf: solutions-manuals/%.tex $(versionless_targets_tex) $(ve
 
 # Build the "see" index entries
 ./scripts/index-see-entries.tex: ./scripts/generate-see-index-entries.py ./scripts/see-index-entries.json
-	python ./scripts/generate-see-index-entries.py ./scripts/see-index-entries.json $@	
+	python ./scripts/generate-see-index-entries.py ./scripts/see-index-entries.json $@
 
 # The all target builds everything
 all: full partial split_partial partial_sewn solutions assignment_solutions exams versioned-tex
@@ -278,6 +278,18 @@ convert_chapter:
 	@echo "Converting $(ch) to markdown..."
 	@python scripts/space_frac_and_tabular_braces.py $(ch) $(ch)
 	@pandoc -s --from=latex+raw_tex -t markdown -o $(ch:tex=md) $(ch) --lua-filter=scripts/latex-to-md-filter.lua
+
+# Convert an old LaTeX exercises file to a new pandoc markdown file using the scripts/latex-to-md-filter.lua script
+# Usage: make convert_exercises ex=chx_whatever_exercises.tex h=X
+# Note: The h=XX argument is optional and is used to create a new directory for the converted exercises file X/source.md
+convert_exercises:
+	@echo "Converting $(ex) to markdown..."
+	@python scripts/space_frac_and_tabular_braces.py $(ex) $(ex)
+	@pandoc -s --from=latex+raw_tex -t markdown -o $(ex:tex=md) $(ex) --lua-filter=scripts/latex-to-md-filter.lua
+	if [ -n "$(h)" ]; then \
+		mkdir -p $(h); \
+		mv $(ex:tex=md) $(h)/source.md; \
+	fi
 
 # Split a converted old LaTeX chapter from its new markdown form using scripts/converted_markdown_split.py script
 # We could do the conversion and splitting in one step, but this allows for the editing of the markdown file before splitting, which is a little more convenient
