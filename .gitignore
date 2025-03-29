@@ -48,5 +48,4 @@ build-sections
 scripts/~$artlog.xlsx
 scripts/~$MITP_Art_Log.xlsx
 matlab_run.sh
-source/StateMint
 .jekyll-cache
