@@ -153,7 +153,7 @@ split/outlined: split/partial
 	$(MAKE) $(patsubst $</%.pdf, $@/%.pdf, $(wildcard $</*.pdf))
 
 # Outline split partial pages with ghostscript
-split/outlined/$(tex_default)_%.pdf: split/partial/$(tex_default)_%.pdf
+split/outlined/%.pdf: split/partial/%.pdf
 	mkdir -p $(dir $@)
 	gs -o $@ -dNoOutputFonts -dColorConversionStrategy=/LeaveColorUnchanged -dEncodeColorImages=false -dEncodeGrayImages=false -dEncodeMonoImages=false -sDEVICE=pdfwrite $<
 
@@ -168,9 +168,9 @@ split/sewn: split/outlined
 	$(MAKE) $(patsubst $</%.pdf, $@/%.pdf, $(wildcard $</*.pdf))
 
 # Sew split outlined partial pages
-split/sewn/$(tex_default)_%.pdf: split/outlined/$(tex_default)_%.pdf
+split/sewn/%.pdf: split/outlined/%.pdf
 	mkdir -p $(dir $@)
-	-(trash) $(dir $@)/*
+	-$(trash) $@
 	./scripts/pdfjam_sew.sh $< $@
 
 # GENERATE THUMBNAILS =======
@@ -258,7 +258,7 @@ build-sections/%.pdf: build-sections/%.tex
 # build a solutions manual
 trashaux = "false" # default don't trash aux files
 solution: $(shell find common -name *.md) $(shell find common/versionless -name *.md) $(shell find source -name *.md)
-	make "solutions-manuals/systems-solutions-manual-0/systems-solutions-manual-0.pdf" # default
+	make "solutions-manuals/ec-solutions-manual-0/ec-solutions-manual-0.pdf" # default
 
 solutions-manuals/%.pdf: solutions-manuals/%.tex $(versionless_targets_tex) $(versioned_targets_tex)
 	$(eval options+= -norc -r latexmkrc_solutions)
