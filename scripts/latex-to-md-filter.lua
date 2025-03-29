@@ -1,5 +1,6 @@
 local system = require 'pandoc.system'
 local string = require 'string'
+local lfs = require "lfs"
 
 
 local block_filter = {
@@ -17,7 +18,16 @@ local block_filter = {
   end,
   Header = function (el)
     return Header(el)
-  end
+  end,
+  Div = function (el)
+    return Div(el)
+  end,
+  Para = function (el)
+    return Para(el)
+  end,
+  OrderedList = function(el)
+    return interior_ordered_lister(el)
+  end,
 }
 local inline_filter = {
   RawInline = function (el)
@@ -131,7 +141,8 @@ end
 
 local function referencer(element)
   local main_text = element.text:match("{(.-)}")
-  return pandoc.RawInline('markdown',"[@" .. main_text .. "]")
+  -- return pandoc.RawInline('markdown',"[@" .. main_text .. "]")
+  return pandoc.RawInline('markdown',"["..main_text.."]{.hashref}")
 end
 
 local function urler(element)
@@ -247,8 +258,8 @@ end
 local function replace_exercise(el)
   -- Extract the ID attribute from the exercise environment
   local id
-  local id1 = el.text:match("ID=(.-),")
-  local id2 = el.text:match("ID=(.-)%]")
+  local id1 = el.text:match("ID=%a+,") -- matches ID=...,
+  local id2 = el.text:match("ID=%a+%]") -- matches ID=...]
   if id1 == nil and id2 == nil then
     id = "IDME"
   elseif id1 == nil then
@@ -258,6 +269,7 @@ local function replace_exercise(el)
   else
     id = id1  -- Take the first one (the one before the comma)
   end
+  id = id:gsub("ID=",""):gsub(",",""):gsub("%]","") -- remove the ID= and the comma or bracket
   local exercise
   if el.text:match("\\begin{exercise}%[") == nil then
     exercise = strip_environment(el,'exercise')
@@ -269,6 +281,11 @@ local function replace_exercise(el)
     {id,{'exercise'}}
   )
   exercise_div.attributes['h'] = id
+  -- Filter the exercise div
+  exercise_div = pandoc.walk_block(
+    exercise_div,
+    block_filter
+  )
   -- Turn into a raw markdown block
   local exercise_div_raw = pandoc.write(pandoc.Pandoc(exercise_div), "markdown")
   --- Remove the last occurrence of :::
@@ -285,12 +302,17 @@ local function replace_solution(el)
   end
   local solution_div = pandoc.Div(
     solution,
-    {class='exercise-solution'}
+    {class='solution'}
+  )
+  -- Filter the solution div
+  solution_div = pandoc.walk_block(
+    solution_div,
+    block_filter
   )
   -- Turn into a raw markdown block
   local solution_div_raw = pandoc.write(pandoc.Pandoc(solution_div), "markdown")
-  --- Append a closing ::: to the end
-  solution_div_raw = solution_div_raw .. "\n:::"
+  --- Add an extra :::
+  solution_div_raw = solution_div_raw:gsub("(.*)","%1\n:::\n")
   return pandoc.RawBlock('markdown',solution_div_raw)
 end
 
@@ -598,6 +620,226 @@ local function pagerefer(el)
   return pandoc.RawInline('markdown',"[@" .. ref .. "]")
 end
 
+local function figurer(el)
+  local main_text = el.text:match("\\begin{rawfigure}(.-)\\end{rawfigure}")
+  -- If there is no rawfigure environment, try the fullwidthfig environment
+  print(main_text)
+  if main_text == nil then
+    main_text = el.text:match("\\begin{fullwidthfig}(.-)\\end{fullwidthfig}")
+  end
+  print(main_text)
+  -- Remove options if they are passed via brackets [] after the begin{rawfigure}. Only remove the first occurrence of []!
+  -- main_text = main_text:gsub("%[.-%]","")
+  brackets_to_remove = starts_with("[",main_text)
+  if brackets_to_remove then
+    -- Find the character position of the first closing bracket
+    local closing_bracket = main_text:find("]")
+    -- Remove everything up to and including the closing bracket
+    main_text = main_text:sub(closing_bracket+1)
+  end
+  -- If \centering is present, remove it and add save a flage to center the image
+  local centering = false
+  if main_text:match("\\centering") then
+    centering = true
+    main_text = main_text:gsub("\\centering","")
+  end
+  -- Extract caption between the braces in \caption{}, recognizing that there can be nested braces in the caption (make sure to get matching braces) %b{} is a pattern that matches balanced braces
+  local caption = main_text:match("\\caption%b{}")
+  if caption == nil then
+    -- See if we can match \captionof{figure}{} instead
+    -- caption = main_text:match("\\captionof%{figure%}%b{}") -- this is not working, giving unexpected end of input
+    -- caption = main_text:match("\\captionof%{figure%}(.-)}") -- these are having trouble with the nested braces
+    caption = main_text:match("\\captionof%{figure%}(.-)\n")
+    if caption == nil then
+      caption = ""
+    end
+  end
+  -- Remove the caption command and the braces from `caption`
+  caption = caption:gsub("\\caption",""):sub(2,-2)
+  -- Remove any \label{} commands from `caption`
+  caption = caption:gsub("\\label%b{}","")
+  -- Capitalize the first letter of the caption (unless it is a LaTeX command or math)
+  caption = caption:gsub("^(%a)",string.upper)
+  -- Read the caption as LaTeX
+  caption = pandoc.read(caption,'latex+raw_tex').blocks
+  if caption[1] == nil then
+    caption = {pandoc.Para('')}
+  end
+  caption = pandoc.walk_block(
+    caption[1],
+    block_filter
+  ).content
+  if caption ~= nil then
+    -- Add the caption to the figure as caption converted to text
+    caption_text = pandoc.utils.stringify(caption)
+  else
+    caption_text = ""
+  end
+  caption_text = caption_text:gsub("^(%a)",string.upper)
+  -- Label
+  local raw_image = false
+  local label = main_text:match("\\label{(.-)}")
+  -- Image source filename or filenames
+  -- Find all matches for \\includegraphics%[.-%]{(.-)}, \\includegraphics{(.-)}, and \\includesvg{(.-)}. The first one that matches will be used
+  -- If none of them match, then the image is raw
+  local graphics_commands = {"\\includegraphics%[.-%]{(.-)}","\\includegraphics{(.-)}","\\includesvg%[.-%]{(.-)}","\\includesvg{(.-)}","\\input{(.-)}"}
+  local image_src = {}
+  local graphics_command_used
+  for i = 1, #graphics_commands do
+    match = main_text:match(graphics_commands[i])
+    if match ~= nil then
+      graphics_command_used = graphics_commands[i]
+      break
+    end
+  end
+  if graphics_command_used == nil then
+    image_src = {"figures/standalone_filename"}
+    raw_image = true
+  else
+    -- Match all image sources (assuming the graphics command is `graphics_command_used`)
+    for src in main_text:gmatch(graphics_command_used) do
+      table.insert(image_src,src)
+    end
+  end
+  local images
+  local rawname
+  if raw_image then
+    -- Create filename. If there is a label, use that (delete fig: from it), otherwise use a random string
+    if label ~= nil then
+      rawname = label:gsub("fig:","")
+    else
+      rawname = unique_random_string()
+    end
+    
+    -- Extract all tikzpicture and circuitikz environments
+    local environments = {}
+    for env in main_text:gmatch("\\begin{tikzpicture}.-\\end{tikzpicture}") do
+      table.insert(environments, env)
+    end
+    for env in main_text:gmatch("\\begin{circuitikz}.-\\end{circuitikz}") do
+      table.insert(environments, env)
+    end
+
+    images = {}
+    
+    for i, env in ipairs(environments) do
+      local env_name
+      if #environments == 1 then
+        env_name = rawname
+      else
+        env_name = rawname .. "-" .. i
+      end
+      local rawpath = "figures/" .. env_name .. "/main"
+      local image_src = {rawpath}
+      local image
+      if #environments > 1 then
+        image = pandoc.Image("", image_src[1])  -- No caption for subfigures
+        image.classes:insert('subfigure')
+      else
+        image = pandoc.Image(caption, image_src[1])
+      end
+      image.classes:insert('figure')
+      image.classes:insert('standalone')
+      image.identifier = 'fig:' .. env_name
+      table.insert(images, image)
+    
+      -- Save the raw image
+      os.execute("mkdir -p figures_converted/"..env_name) -- Make the figures_converted directory if it doesn't exist
+      local f = assert(io.open("figures_converted/"..env_name.."/main.tex", "wb"))
+      
+      -- Extract the preamble from common/figures/0-standalone-tikz-template/main.tex
+      local preamble = assert(io.open("common/figures/0-standalone-tikz-template/main.tex", "rb"))
+      local preamble_content = preamble:read("*all")
+      preamble:close()
+      
+      -- Take the first part of `preamble`, up to the first \begin{document}
+      preamble_content = preamble_content:match("(.-)\\begin{document}").."%\n\\begin{document}%\n"
+      
+      -- Write the preamble to the file
+      f:write(preamble_content)
+      
+      -- Write the environment to the file
+      local env_text = env:gsub("\\caption%b{}", "") -- Remove the caption
+      env_text = env_text:gsub("\\label%b{}", "") -- Remove the label
+      env_text = env_text:gsub("\n", "%%\n") -- Add a % to the end of each line
+      f:write(env_text.."\n")
+      
+      -- Write the end of the document to the file
+      f:write("\\end{document}")
+      f:close()
+      
+      -- Copy the Makefile common/figures/0-standalone-tikz-template/Makefile to figures_converted/env_name/Makefile
+      os.execute("cp common/figures/0-standalone-tikz-template/Makefile figures_converted/"..env_name.."/Makefile")
+    end
+  else
+    -- Replace svg extensions with pdf
+    for i = 1, #image_src do
+      image_src[i] = image_src[i]:gsub("%.svg",".pdf")
+    end
+    -- image = {pandoc.Image(caption,image_src)}
+    if #image_src == 1 then
+      images = {pandoc.Image(caption,image_src[1])}
+    else
+      for i = 1, #image_src do
+        -- Add an image to the images table
+        if i == 1 then
+          images = {pandoc.Image("",image_src[i])}
+        else
+          table.insert(images,pandoc.Image("",image_src[i]))
+        end
+      end
+    end
+  end
+  if rawname ~= nil then
+    label = "fig:"..rawname
+  end
+  local figure
+  if #images > 1 then
+    local images_w_cap
+    if caption ~= nil then
+      images[#images+1] = caption
+      images_w_cap = images
+    else
+      images_w_cap = images
+    end
+    figure = pandoc.Div(
+      images_w_cap,
+      {label,{'figure','subfigures'}}
+    )
+  else
+    figure = images[1]
+  end
+  figure.attributes['h'] = label
+  figure.attributes['caption_plain'] = caption_text
+  figure.identifier = label
+  figure.classes:insert('figure')
+  return figure
+end
+
+function interior_ordered_lister(el)
+  if FORMAT:match 'latex' then
+    -- Walk with interior_filter
+    el = pandoc.walk_block(el,interior_filter)
+    return el -- going to make alpha in environments.sty
+  elseif FORMAT:match 'html' then
+    -- el.classes[#el.classes+1] = 'alpha-ol' -- Apparently OrderedList elements don't have classes anymore? Getting "attempt to index a nil value (field 'classes')" error
+    return el 
+  else
+    return el 
+  end
+end
+
+
+-------------
+
+function OrderedList(el)
+  if FORMAT:match 'latex' then
+    return interior_ordered_lister(el)
+  else
+    return el
+  end
+end
+
 function RawInline(el)
   if starts_with('\\keyword', el.text) then
     return keyworder(el)
@@ -633,6 +875,8 @@ function RawInline(el)
     return {}
   elseif starts_with('\\p ', el.text) then
     return {}
+  elseif starts_with('\\quad', el.text) then
+    return {}
   elseif starts_with('\\pageref', el.text) then
     return pagerefer(el)
   elseif starts_with('\\maybeeqn', el.text) then
@@ -646,11 +890,18 @@ function RawInline(el)
   end
 end
 
+function Figure(el)
+  return el -- Raw figures will be processed in the RawBlock function
+end
+
 function RawBlock(el)
   if starts_with('\\begin{myexample}', el.text) then
     local id = el.text:match("\\label{(.-)}")
     local converted = replace_myexample(el)
     return pandoc.Div(converted,{id=id, class='example'})
+  elseif starts_with('\\begin{center}', el.text) then
+    print("\n\nCentering\n\n") -- Doesn't seem to happen
+    return el
   elseif starts_with('\\begin{myexamplealways}', el.text) then
     local id = el.text:match("\\label{(.-)}")
     local converted = replace_myexamplealways(el)
@@ -666,6 +917,8 @@ function RawBlock(el)
   elseif starts_with('\\cloze', el.text) then
     return clozer_block(el)
   elseif starts_with('\\clearpage', el.text) then
+    return {}
+  elseif starts_with('\\bigbreak', el.text) then
     return {}
   elseif starts_with('\\centering', el.text) then
     return {}
@@ -695,6 +948,12 @@ function RawBlock(el)
     return {}
   elseif starts_with('\\smallskip', el.text) then
     return {}
+  elseif starts_with('\\begingroup', el.text) then
+    return {}
+  elseif starts_with('\\endgroup', el.text) then
+    return {}
+  elseif starts_with('\\intextsep', el.text) then
+    return {}
   elseif starts_with('\\begin{textbook', el.text) then
     return replace_textbook(el)
   elseif starts_with('\\begin{definition}', el.text) then
@@ -713,6 +972,15 @@ function RawBlock(el)
     return replace_mayb(el)
   elseif starts_with('\\examplemaybe', el.text) then
     return replace_examplemaybe(el)
+  elseif starts_with('\\begin{fullwidthfig}', el.text) then
+    return figurer(el)
+  elseif starts_with('\\begin{rawfigure}', el.text) then
+    return figurer(el)
+  elseif starts_with('\\begin{tikzpicture}', el.text) then
+    -- Wrap the environment in a \begin{rawfigure} environment
+    local main_text = "\\begin{rawfigure}\n"..el.text.."\n\\end{rawfigure}"
+    el.text = main_text
+    return figurer(el)
   else
     return el
   end
@@ -748,7 +1016,7 @@ function Table (tbl)
       -- Write the cell to html with MathJax support for math (i.e., LaTeX math)
       -- cell = pandoc.walk_block(cell, block_filter)
       local doc = pandoc.Pandoc(cell)
-      cell = pandoc.write(doc, "html+tex_math_dollars+raw_tex")
+      cell = pandoc.write(doc, "markdown+tex_math_dollars+raw_tex") -- Have to use markdown because html converts simple the math to text
       result = result .. "\n\t<td>" .. pandoc.utils.stringify(cell) .. "</td>"
     end
     result = result .. "\n</tr>"
@@ -789,6 +1057,46 @@ function OrderedList (el)
   return el
 end
 
+function Div(el)
+  if el.classes:includes('center') then
+    -- If there is an Image in the Div, wrap the entire contents of this Div in a rawfigure environment and process it with the figurer function
+    for i, item in ipairs(el.content) do
+      if item.t == "Image" then
+        -- Wrap the contents of the Div in a rawfigure environment
+        local main_text = "\\begin{rawfigure}\n"..pandoc.write(pandoc.Pandoc(el.content), "latex+raw_tex").."\n\\end{rawfigure}"
+        el = pandoc.RawBlock('latex',main_text)
+        -- Process the rawfigure environment with the figurer function
+        return figurer(el)
+      elseif item.t == "RawBlock" then
+          if starts_with('\\begin{tikzpicture}', item.text) then
+            -- Wrap the environment in a \begin{rawfigure} environment
+            local main_text = "\\begin{rawfigure}\n"..pandoc.write(pandoc.Pandoc(el.content), "latex+raw_tex").."\n\\end{rawfigure}"
+            el = pandoc.RawBlock('latex',main_text)
+            return figurer(item)
+          end
+      end
+    end
+    return el
+  else
+    return el
+  end
+end
+
+function Para(el)
+  -- If there is an Image in the Para, wrap the entire contents of this Para in a rawfigure environment and process it with the figurer function
+  for i, item in ipairs(el.content) do
+    if item.t == "Image" then
+      -- Wrap the contents of the Para in a rawfigure environment
+      local main_text = "\\begin{rawfigure}\n"..pandoc.write(pandoc.Pandoc(el.content), "latex+raw_tex").."\n\\end{rawfigure}"
+      el.content = pandoc.read(main_text,'latex+raw_tex').blocks
+      el = pandoc.RawBlock('latex',main_text)
+      -- Process the rawfigure environment with the figurer function
+      return figurer(el)
+    end
+  end
+  return el
+end
+
 return {
-  {RawInline = RawInline, OrderedList = OrderedList, Table = Table, RawBlock = RawBlock, Header = Header}
+  {RawInline = RawInline, OrderedList = OrderedList, Table = Table, RawBlock = RawBlock, Header = Header, Figure = Figure, Div = Div, OrderedList = OrderedList}
 }

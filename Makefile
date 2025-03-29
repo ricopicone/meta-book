@@ -269,6 +269,9 @@ solutions-manuals/%.pdf: solutions-manuals/%.tex $(versionless_targets_tex) $(ve
 ./scripts/index-see-entries.tex: ./scripts/generate-see-index-entries.py ./scripts/see-index-entries.json
 	python ./scripts/generate-see-index-entries.py ./scripts/see-index-entries.json $@
 
+scripts/see-index-entries.json:
+	@echo "Please create the see-index-entries.json file."
+
 # The all target builds everything
 all: full partial split_partial partial_sewn solutions assignment_solutions exams versioned-tex
 
@@ -276,8 +279,9 @@ all: full partial split_partial partial_sewn solutions assignment_solutions exam
 # Usage: make convert_chapter ch=chXX.tex
 convert_chapter:
 	@echo "Converting $(ch) to markdown..."
+	@python scripts/rawize_figures.py $(ch) $(ch)
 	@python scripts/space_frac_and_tabular_braces.py $(ch) $(ch)
-	@pandoc -s --from=latex+raw_tex -t markdown -o $(ch:tex=md) $(ch) --lua-filter=scripts/latex-to-md-filter.lua
+	@pandoc -s --from=latex+raw_tex -t markdown+raw_tex -o $(ch:tex=md) $(ch) --lua-filter=scripts/latex-to-md-filter.lua
 
 # Convert an old LaTeX exercises file to a new pandoc markdown file using the scripts/latex-to-md-filter.lua script
 # Usage: make convert_exercises ex=chx_whatever_exercises.tex h=X
