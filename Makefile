@@ -395,10 +395,16 @@ exam_sample_config:
 	@if [ -f meta-book/scripts/exams/exam_config_sample.yaml ]; then \
 		cp meta-book/scripts/exams/exam_config_sample.yaml "$(EXAMS_DIR)/"; \
 		echo "Wrote: $(EXAMS_DIR)/exam_config_sample.yaml"; \
+	elif [ -f scripts/exams/exam_config_sample.yaml ]; then \
+		cp scripts/exams/exam_config_sample.yaml "$(EXAMS_DIR)/"; \
+		echo "Wrote: $(EXAMS_DIR)/exam_config_sample.yaml"; \
 	elif [ -f "$(EXAMS_DIR)/../meta-book/scripts/exams/exam_config_sample.yaml" ]; then \
 		cp "$(EXAMS_DIR)/../meta-book/scripts/exams/exam_config_sample.yaml" "$(EXAMS_DIR)/"; \
 		echo "Wrote: $(EXAMS_DIR)/exam_config_sample.yaml"; \
+	elif [ -f "$(EXAMS_DIR)/../scripts/exams/exam_config_sample.yaml" ]; then \
+		cp "$(EXAMS_DIR)/../scripts/exams/exam_config_sample.yaml" "$(EXAMS_DIR)/"; \
+		echo "Wrote: $(EXAMS_DIR)/exam_config_sample.yaml"; \
 	else \
-		echo "Warning: Could not locate sample config"; \
-		echo "Check that the meta-book submodule is initialized."; \
+		echo "Warning: Could not locate sample config in meta-book or scripts/exams."; \
+		echo "Either initialize meta-book or link scripts with meta-book/link-there.py, or set EXAM_SYSTEM_DIR for the wrapper."; \
 	fi
