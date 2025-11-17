@@ -1,0 +1,4 @@
+# Python dependencies for the exam generation system
+# Install with: pip install -r requirements.txt
+
+PyYAML>=5.1

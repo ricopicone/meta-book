@@ -1,5 +1,10 @@
 
-.PHONY: full partial p split_partial split_full split partial_sewn sewn solutions sol assignment_solutions asol all website exams spellcheck section source solution find split/outlined split/sewn split/partial thumbnails split/thumbnails thumbnail_single
+.PHONY: full partial p split_partial split_full split partial_sewn sewn solutions sol assignment_solutions asol all website exams spellcheck section source solution find split/outlined split/sewn split/partial thumbnails split/thumbnails thumbnail_single \
+	exam exam_noquick exam_quick exam_solutions exam_list exam_validate exam_stats exam_help exam_sample_config
+
+# Short-circuit heavy includes/logic when invoking only exam targets
+EXAM_GOALS := exams exam exam_noquick exam_quick exam_solutions exam_list exam_validate exam_stats exam_help exam_sample_config
+EXAM_ONLY := $(filter $(EXAM_GOALS),$(MAKECMDGOALS))
 
 # Determine the name of the main tex file
 edition = 0# default - pass edition="hp2" to make another edition, e.g. make edition="hp2" or make full edition="hp2"
@@ -206,8 +211,11 @@ $(commondir)/source_dependencies.mk: $(commondir)/source-dependencies.json
 
 $(commondir)/source-dependencies.json:
 
+# Skip heavyweight includes when running exam-only targets from the repo root
+ifeq ($(EXAM_ONLY),)
 include $(commondir)/common.mk
 include $(commondir)/source_dependencies.mk
+endif
 
 versionless-tex: $(versionless_targets_tex)
 
@@ -307,3 +315,90 @@ sample:
 	convert -size 612x792 -pointsize 16 -gravity center label:"This is a sample.\nThe number of pages available is limited." removed.pdf
 	pdftk B=$(tex_default).pdf R=removed.pdf cat $(shell python sample_pages.py) output sample.pdf owner_pw MRFM user_pw RTC_Book
 	rm removed.pdf
+
+# ==========================
+# Exam generation interface
+# ==========================
+
+EXAMS_DIR ?= exams
+EXAM_WRAPPER ?= $(EXAMS_DIR)/exam-gen.sh
+
+# Top-level "exams" target: show quick help
+exams:
+	@echo "Exam targets (run from repo root):"
+	@echo "  make exam CONFIG=exams/my_exam.yaml            # generate + compile"
+	@echo "  make exam_noquick CONFIG=exams/my_exam.yaml    # generate only"
+	@echo "  make exam PROBLEMS=id1,id2 TITLE='Quiz 1' ...  # ad-hoc selection"
+	@echo "  make exam_solutions CONFIG=exams/my_exam.yaml  # with solutions"
+	@echo "  make exam_sample_config                        # write sample YAML to exams/"
+	@echo "  make exam_list                                 # list exercises"
+	@echo "  make exam_validate                             # validate DB"
+	@echo "  make exam_stats                                # DB stats"
+	@echo "Use variables: CONFIG, PROBLEMS, TITLE, INSTRUCTOR, COURSE, VERSION, DATE, OUTPUT, INSTRUCTIONS, NO_QUICK=true"
+
+# Build command helper
+define run_exam_cmd
+	@if [ ! -x "$(EXAM_WRAPPER)" ]; then \
+		echo "Missing $(EXAM_WRAPPER). Run: python3 meta-book/link-there.py or see meta-book/scripts/exams"; \
+		exit 1; \
+	fi; \
+	cmd="$(EXAM_WRAPPER)"; \
+	if [ "$(NO_QUICK)" = "true" ]; then cmd="$$cmd --no-quick"; fi; \
+	if [ -n "$(CONFIG)" ]; then cmd="$$cmd --config '$(CONFIG)'"; fi; \
+	if [ -n "$(PROBLEMS)" ]; then cmd="$$cmd --problems '$(PROBLEMS)'"; fi; \
+	if [ -n "$(TITLE)" ]; then cmd="$$cmd --title '$(TITLE)'"; fi; \
+	if [ -n "$(INSTRUCTOR)" ]; then cmd="$$cmd --instructor '$(INSTRUCTOR)'"; fi; \
+	if [ -n "$(COURSE)" ]; then cmd="$$cmd --course '$(COURSE)'"; fi; \
+	if [ -n "$(VERSION)" ]; then cmd="$$cmd --version '$(VERSION)'"; fi; \
+	if [ -n "$(DATE)" ]; then cmd="$$cmd --date '$(DATE)'"; fi; \
+	if [ -n "$(OUTPUT)" ]; then cmd="$$cmd --output '$(OUTPUT)'"; fi; \
+	if [ -n "$(INSTRUCTIONS)" ]; then cmd="$$cmd --instructions '$(INSTRUCTIONS)'"; fi; \
+	if [ "$(SOLUTIONS)" = "true" ]; then cmd="$$cmd --solutions"; fi; \
+	echo "Running: $$cmd"; \
+	eval "$$cmd"
+endef
+
+# Generate and compile (default behavior)
+exam:
+	$(call run_exam_cmd)
+
+# Generate only (no PDF)
+exam_noquick:
+	@$(MAKE) exam NO_QUICK=true --no-print-directory
+
+# Alias for clarity
+exam_quick:
+	@$(MAKE) exam --no-print-directory
+
+# Generate with solutions (and compile by default)
+exam_solutions:
+	@$(MAKE) exam SOLUTIONS=true --no-print-directory
+
+# Utility targets
+exam_list:
+	@$(EXAM_WRAPPER) --list
+
+exam_validate:
+	@$(EXAM_WRAPPER) --validate
+
+exam_stats:
+	@$(EXAM_WRAPPER) --stats
+
+exam_help:
+	@$(EXAM_WRAPPER) --help
+
+# Create a sample exam YAML in exams/
+exam_sample_config:
+	@$(EXAM_WRAPPER) --sample-config
+	@echo "Copying sample config into $(EXAMS_DIR)/ ..."
+	@mkdir -p $(EXAMS_DIR)
+	@if [ -f meta-book/scripts/exams/exam_config_sample.yaml ]; then \
+		cp meta-book/scripts/exams/exam_config_sample.yaml "$(EXAMS_DIR)/"; \
+		echo "Wrote: $(EXAMS_DIR)/exam_config_sample.yaml"; \
+	elif [ -f "$(EXAMS_DIR)/../meta-book/scripts/exams/exam_config_sample.yaml" ]; then \
+		cp "$(EXAMS_DIR)/../meta-book/scripts/exams/exam_config_sample.yaml" "$(EXAMS_DIR)/"; \
+		echo "Wrote: $(EXAMS_DIR)/exam_config_sample.yaml"; \
+	else \
+		echo "Warning: Could not locate sample config"; \
+		echo "Check that the meta-book submodule is initialized."; \
+	fi
