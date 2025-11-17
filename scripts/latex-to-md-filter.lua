@@ -28,6 +28,9 @@ local block_filter = {
   OrderedList = function(el)
     return interior_ordered_lister(el)
   end,
+  Figure = function(el)
+    return Figure(el)
+  end,
 }
 local inline_filter = {
   RawInline = function (el)
@@ -334,7 +337,9 @@ local function replace_input(el)
   local filename = el.text:match("\\input{(.-)}")
   -- if there is no .tex extension, add it
   if not string.match(filename,"%.tex$") then
-    filename = filename .. ".tex"
+    if not string.match(filename,"%.pgf") then
+      filename = filename .. ".tex"
+    end
   end
   local f = assert(io.open(filename, "rb"))
   local content = f:read("*all")
@@ -623,11 +628,9 @@ end
 local function figurer(el)
   local main_text = el.text:match("\\begin{rawfigure}(.-)\\end{rawfigure}")
   -- If there is no rawfigure environment, try the fullwidthfig environment
-  print(main_text)
   if main_text == nil then
     main_text = el.text:match("\\begin{fullwidthfig}(.-)\\end{fullwidthfig}")
   end
-  print(main_text)
   -- Remove options if they are passed via brackets [] after the begin{rawfigure}. Only remove the first occurrence of []!
   -- main_text = main_text:gsub("%[.-%]","")
   brackets_to_remove = starts_with("[",main_text)
@@ -809,17 +812,21 @@ local function figurer(el)
   else
     figure = images[1]
   end
-  figure.attributes['h'] = label
-  figure.attributes['caption_plain'] = caption_text
-  figure.identifier = label
-  figure.classes:insert('figure')
+  if figure ~= nil then
+    figure.attributes['h'] = label
+    figure.attributes['caption_plain'] = caption_text
+    figure.identifier = label
+    figure.classes:insert('figure')
+  else
+    figure = pandoc.Para('Error: No figure found')
+  end
   return figure
 end
 
 function interior_ordered_lister(el)
   if FORMAT:match 'latex' then
-    -- Walk with interior_filter
-    el = pandoc.walk_block(el,interior_filter)
+    -- Walk with inline_filter
+    el = pandoc.walk_block(el,inline_filter)
     return el -- going to make alpha in environments.sty
   elseif FORMAT:match 'html' then
     -- el.classes[#el.classes+1] = 'alpha-ol' -- Apparently OrderedList elements don't have classes anymore? Getting "attempt to index a nil value (field 'classes')" error

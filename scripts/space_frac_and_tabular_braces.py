@@ -15,6 +15,9 @@ def space_frac_and_tabular_braces(input_file, output_file):
         for line in lines:
             # Add space between the middle braces of \frac{a}{b} -> \frac{a} {b}
             line = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'\\frac{\1} {\2}', line)
+            # Add space between the middle braces of \dfrac{a}{b} -> \dfrac{a} {b}
+            line = re.sub(r'\\dfrac\{([^}]+)\}\{([^}]+)\}', r'\\dfrac{\1} {\2}', line)
+            # Add space between the middle braces of \begin{tabular}{} -> \begin{tabular} {}
             line = line.replace(r'\begin{tabular}{', r'\begin{tabular} {')
             f.write(line)
 
