@@ -34,8 +34,8 @@ fi
 # Base path for exercise files (relative to where the exam system runs)
 export BASE_PATH="../../.."
 
-# Exercise pattern (default works for electronics book)
-export EXERCISE_PATTERN="${EXERCISE_PATTERN:-ch*_exercises.tex}"
+# Exercise pattern (default includes both chapter exercises and versioned exercises)
+export EXERCISE_PATTERN="${EXERCISE_PATTERN:-ch*_exercises.tex,common/versioned/*/index.tex}"
 
 # Styles path (default works for electronics book)
 export STYLES_PATH="${STYLES_PATH:-common/styles-tex}"

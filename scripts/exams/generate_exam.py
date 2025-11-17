@@ -47,20 +47,37 @@ class ExerciseExtractor:
         
         Args:
             base_path: Base path to the book directory containing exercise files
-            exercise_pattern: Glob pattern for exercise files (default: "ch*_exercises.tex")
+            exercise_pattern: Glob pattern(s) for exercise files (default: "ch*_exercises.tex")
+                             Multiple patterns can be separated by commas
         """
         self.base_path = Path(base_path)
-        self.exercise_pattern = exercise_pattern
+        # Support multiple patterns separated by commas
+        if ',' in exercise_pattern:
+            self.exercise_patterns = [p.strip() for p in exercise_pattern.split(',')]
+        else:
+            self.exercise_patterns = [exercise_pattern]
         self.exercises_db = {}
         self._load_exercises()
 
     def _load_exercises(self):
         """Load all exercises from chapter files into memory."""
-        # Find all exercise files matching the pattern
-        exercise_files = sorted(self.base_path.glob(self.exercise_pattern))
+        # Find all exercise files matching the patterns
+        exercise_files = []
+        for pattern in self.exercise_patterns:
+            matched_files = sorted(self.base_path.glob(pattern))
+            exercise_files.extend(matched_files)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_files = []
+        for f in exercise_files:
+            if f not in seen:
+                seen.add(f)
+                unique_files.append(f)
+        exercise_files = unique_files
         
         if not exercise_files:
-            print(f"Warning: No exercise files found matching pattern '{self.exercise_pattern}' in {self.base_path}")
+            print(f"Warning: No exercise files found matching patterns {self.exercise_patterns} in {self.base_path}")
             return
         
         for file_path in exercise_files:
@@ -488,7 +505,8 @@ def main():
     parser.add_argument('--list', action='store_true', help='List available exercises')
     parser.add_argument('--sample-config', action='store_true', help='Create sample config file')
     parser.add_argument('--base-path', default='..', help='Base path to exercise files')
-    parser.add_argument('--exercise-pattern', default='ch*_exercises.tex', help='Glob pattern for exercise files')
+    parser.add_argument('--exercise-pattern', default='ch*_exercises.tex', 
+                       help='Glob pattern(s) for exercise files (comma-separated for multiple patterns)')
     parser.add_argument('--styles-path', default='common/styles-tex', help='Path to book style files (relative to book root)')
     parser.add_argument('--no-quick', action='store_true', help='Skip PDF compilation (default: compile PDF)')
 
