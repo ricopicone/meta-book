@@ -13,8 +13,9 @@
         "../latexmkrc_main": "latexmkrc_main",
         "../latexmkrc_solutions": "latexmkrc_solutions",
         "../Makefile": "Makefile",
-        "../new-versionless-text.py": "new-versionless-text.py",
-        "../requirements.txt": "requirements.txt"
+    "../new-versionless-text.py": "new-versionless-text.py",
+    "../requirements.txt": "requirements.txt",
+    "../exams/exam-gen.sh": "scripts/exams/exam-gen.sh"
     },
     "directories":{
         "../scripts": "scripts"

@@ -1,0 +1,20 @@
+course: Course Name
+date: March 15, 2024
+include_solutions: false
+instructions: Show all work for full credit. Clearly indicate your final answers.
+  Use appropriate units in your calculations. Partial credit will be given for correct
+  methodology.
+instructor: Dr. Smith
+problems:
+- id: exercise1
+  instructions: Show all work clearly.
+  points: 20
+- id: exercise2
+  points: 25
+- exercise3
+- id: exercise4
+  instructions: Use appropriate methods.
+  points: 30
+time_limit: 'Time Limit: 2 hours'
+title: Midterm Exam
+version: A
