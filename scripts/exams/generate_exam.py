@@ -178,6 +178,7 @@ class ExamGenerator:
 \usepackage{lastpage}
 \usepackage{enumerate}
 \usepackage{enumitem}
+\usepackage{xparse}  % For NewDocumentCommand used in simplified macros
 
 % Essential packages for figures and subfigures
 \usepackage{graphicx}
@@ -196,6 +197,30 @@ class ExamGenerator:
 % Import book style files directly
 \usepackage{<<STYLES_PATH>>/bookmathmacros}
 \usepackage{<<STYLES_PATH>>/booktikz}
+
+% Simplified version of book macros for exams
+% These override complex book macros that have dependencies we don't need in exams
+
+% Simplified figcaption that just calls standard caption
+% Arguments: [optional key/value][optional float/nofloat]{id}{caption}
+\makeatletter
+\NewDocumentCommand{\figcaption}{o O{float} m m}{%
+  \caption{#4}%
+  \label{#3}%
+}
+\makeatother
+
+% Simplified tabcaption that just calls standard caption
+% Arguments: [short caption][float/nofloat]{id}{caption}
+\makeatletter
+\NewDocumentCommand{\tabcaption}{O{#4} O{float} m m}{%
+  \caption[#1]{#4}%
+  \label{#3}%
+}
+\makeatother
+
+% Define graphicslist as empty (used by book's figcaption)
+\def\graphicslist{}
 
 % Simple counter for problems
 \newcounter{problem}
