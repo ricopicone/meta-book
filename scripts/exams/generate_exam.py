@@ -222,6 +222,10 @@ class ExamGenerator:
 % Define graphicslist as empty (used by book's figcaption)
 \def\graphicslist{}
 
+% Set default enumerate labels to lowercase alphabetical
+\setlist[enumerate,1]{label=\alph*.}
+\setlist[enumerate,2]{label=\roman*.}
+
 % Simple counter for problems
 \newcounter{problem}
 \setcounter{problem}{0}
@@ -370,6 +374,9 @@ class ExamGenerator:
             # Remove any \begin{exercise} and \end{exercise} from the content
             content = re.sub(r'\\begin\{exercise\}.*?\n', '', content)
             content = re.sub(r'\\end\{exercise\}', '', content)
+            # Remove enumerate label definitions (so exam defaults are used)
+            # Match lines like: \def\labelenumi{\arabic{enumi}.}
+            content = re.sub(r'^\\def\\labelenum.*\n', '', content, flags=re.MULTILINE)
             problems_latex += content
 
             # Add solution if requested
