@@ -338,11 +338,13 @@ class ExamGenerator:
                 identifier = problem_spec
                 points = None
                 custom_instructions = None
+                page_break_after = False
             elif isinstance(problem_spec, dict):
                 # Dictionary with additional options
                 identifier = problem_spec['id']
                 points = problem_spec.get('points')
                 custom_instructions = problem_spec.get('instructions')
+                page_break_after = problem_spec.get('page_break', False)
             else:
                 print(f"Warning: Invalid problem specification: {problem_spec}")
                 continue
@@ -379,8 +381,12 @@ class ExamGenerator:
                 solution = re.sub(r'\\end\{solution\}', '', solution)
                 problems_latex += solution
 
-            # Add spacing between problems
-            problems_latex += "\n\\problemspace\n"
+            # Add page break if requested
+            if page_break_after:
+                problems_latex += "\n\\clearpage\n"
+            else:
+                # Add spacing between problems
+                problems_latex += "\n\\problemspace\n"
 
         return problems_latex
 
@@ -402,7 +408,7 @@ def create_sample_config():
         'instructions': 'Show all work for full credit. Clearly indicate your final answers. Use appropriate units in your calculations. Partial credit will be given for correct methodology.',
         'problems': [
             {'id': 'exercise1', 'points': 20, 'instructions': 'Show all work clearly.'},
-            {'id': 'exercise2', 'points': 25},
+            {'id': 'exercise2', 'points': 25, 'page_break': True},  # Page break after this problem
             'exercise3',  # Simple identifier
             {'id': 'exercise4', 'points': 30, 'instructions': 'Use appropriate methods.'}
         ]
