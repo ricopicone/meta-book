@@ -1,34 +1,57 @@
 #!/bin/bash
 # Wrapper script for exam generation using the meta-book exam system
-# This allows you to run exam commands from a book's exams/ directory
-# while using the generic system from meta-book/scripts/exams/.
-#
-# Usage (from a book repo):
-#   ./exam-gen.sh --list
-#   ./exam-gen.sh --config midterm.yaml
-#   ./exam-gen.sh --no-quick --config midterm.yaml
-#
-# Note: This file is intended to be linked into each book's exams/ via meta-book/links.json
-# using link-there.py. It assumes the meta-book folder is at ../meta-book relative to exams/.
+# This allows you to run exam commands from the exams/ directory
+# while using the generic system from meta-book/scripts/exams/
 
-# Path to the meta-book exam system (relative to exams/ directory)
-# Prefer the canonical meta-book path; alternatively, if scripts/exams exists in the repo
-# (via link-there), you can change this to "../scripts/exams".
-EXAM_SYSTEM_DIR="../meta-book/scripts/exams"
+# Resolve paths relative to this script's directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Determine exam system directory with fallbacks
+# Priority:
+#  1) EXAM_SYSTEM_DIR env var (if set and exists)
+#  2) ../meta-book/scripts/exams relative to this script
+#  3) ../scripts/exams relative to this script (when linked via link-there)
+#  4) ../../meta-book/scripts/exams (if exams/ is nested differently)
+#  5) ../../scripts/exams
+if [ -n "${EXAM_SYSTEM_DIR}" ] && [ -d "${EXAM_SYSTEM_DIR}" ]; then
+    : # use provided env var
+else
+    CANDIDATES=(
+        "${SCRIPT_DIR}/../meta-book/scripts/exams"
+        "${SCRIPT_DIR}/../scripts/exams"
+        "${SCRIPT_DIR}/../../meta-book/scripts/exams"
+        "${SCRIPT_DIR}/../../scripts/exams"
+    )
+    EXAM_SYSTEM_DIR=""
+    for d in "${CANDIDATES[@]}"; do
+        if [ -d "$d" ]; then
+            EXAM_SYSTEM_DIR="$d"
+            break
+        fi
+    done
+fi
 
 # Base path for exercise files (relative to where the exam system runs)
 export BASE_PATH="../../.."
 
-# Exercise pattern (default works for many books)
+# Exercise pattern (default works for electronics book)
 export EXERCISE_PATTERN="${EXERCISE_PATTERN:-ch*_exercises.tex}"
 
-# Styles path (default works for books that put styles in common/styles-tex)
+# Styles path (default works for electronics book)
 export STYLES_PATH="${STYLES_PATH:-common/styles-tex}"
 
 # Check if exam system exists
-if [ ! -d "$EXAM_SYSTEM_DIR" ]; then
-    echo "Error: Exam system not found at $EXAM_SYSTEM_DIR"
-    echo "Make sure the meta-book submodule is initialized."
+if [ -z "$EXAM_SYSTEM_DIR" ] || [ ! -d "$EXAM_SYSTEM_DIR" ]; then
+    echo "Error: Exam system not found."
+    echo "Tried:"
+    echo "  - \\"${SCRIPT_DIR}/../meta-book/scripts/exams\\""
+    echo "  - \\"${SCRIPT_DIR}/../scripts/exams\\""
+    echo "  - \\"${SCRIPT_DIR}/../../meta-book/scripts/exams\\""
+    echo "  - \\"${SCRIPT_DIR}/../../scripts/exams\\""
+    echo "Options to fix:"
+    echo "  1) Initialize the meta-book submodule (recommended)"
+    echo "  2) Link the exam system into scripts/exams via meta-book/link-there.py"
+    echo "  3) Set EXAM_SYSTEM_DIR to point to scripts/exams"
     exit 1
 fi
 
