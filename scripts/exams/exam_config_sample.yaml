@@ -10,6 +10,7 @@ problems:
   instructions: Show all work clearly.
   points: 20
 - id: exercise2
+  page_break: true
   points: 25
 - exercise3
 - id: exercise4

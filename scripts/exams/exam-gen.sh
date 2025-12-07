@@ -35,7 +35,7 @@ fi
 export BASE_PATH="../../.."
 
 # Exercise pattern (default includes both chapter exercises and versioned exercises)
-export EXERCISE_PATTERN="${EXERCISE_PATTERN:-ch*_exercises.tex,common/versioned/*/index.tex}"
+export EXERCISE_PATTERN="${EXERCISE_PATTERN:-*/exercises.tex,common/versioned/*/index.tex}"
 
 # Styles path (default works for electronics book)
 export STYLES_PATH="${STYLES_PATH:-common/styles-tex}"
