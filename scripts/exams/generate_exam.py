@@ -257,7 +257,7 @@ class ExamGenerator:
   \begin{center}
     {\Large \textbf{\examtitle}} \\[0.3cm]
     {\large \coursename\ --- Version \examversion} \\[0.2cm]
-    {\normalsize \examdate\ --- \examtime} \\[0.2cm]
+    {\normalsize \examdate\ \examtime} \\[0.2cm]
     {\normalsize \instructorname}
   \end{center}
   \vspace{0.3cm}
@@ -315,13 +315,16 @@ class ExamGenerator:
         replacements = {
             '<<EXAM_TITLE>>': config.get('title', 'Exam'),
             '<<EXAM_DATE>>': config.get('date', datetime.now().strftime('%B %d, %Y')),
-            '<<EXAM_TIME>>': config.get('time_limit', 'Time Limit: 2 hours'),
             '<<COURSE_NAME>>': config.get('course', 'Course'),
             '<<INSTRUCTOR_NAME>>': config.get('instructor', 'Instructor'),
             '<<EXAM_VERSION>>': config.get('version', 'A'),
             '<<EXAM_INSTRUCTIONS>>': config.get('instructions', 'Show all work for full credit. Clearly indicate your final answers. Use appropriate units in your calculations.'),
             '<<STYLES_PATH>>': self.styles_path
         }
+        if config.get('time_limit'):
+            replacements['<<EXAM_TIME>>'] = ' --- ' + config['time_limit']
+        else:
+            replacements['<<EXAM_TIME>>'] = ''
 
         for placeholder, value in replacements.items():
             header = header.replace(placeholder, value)
