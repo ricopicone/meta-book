@@ -49,3 +49,4 @@ scripts/~$artlog.xlsx
 scripts/~$MITP_Art_Log.xlsx
 matlab_run.sh
 .jekyll-cache
+*__pycache__*

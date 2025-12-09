@@ -61,7 +61,7 @@ endif
 
 # Source files
 commondir = ./common
-chapters = $(shell find . -type f -name 'ch*.tex')
+chapters = $(shell find . -type f -not -path './exams/*' -name 'ch*.tex')
 exercises = $(wildcard ch*_exercises.tex)
 appendices = $(wildcard ap*.tex)
 figures = $(wildcard figures/*.pdf)
@@ -80,7 +80,7 @@ statemint_makes = $(shell find ./source/StateMint -type f -name '*Makefile')
 meta_book_makes = $(shell find ./meta-book -type f -name '*Makefile')
 meta_common_makes = $(shell find ./common/meta-common -type f -name '*Makefile')
 nosubmakes = $(lua_filters) $(engcom_makes) $(statemint_makes) $(source_makes) $(meta_book_makes) $(meta_common_makes)
-submakefiles = $(filter-out $(nosubmakes), $(shell find . -mindepth 2 -type f -not -path './common/source/matlab/matlab2tikz/*' -not -path './common/lua-filters'  -not -path './exams' -name '*Makefile'))
+submakefiles = $(filter-out $(nosubmakes), $(shell find . -mindepth 2 -type f -not -path './common/source/matlab/matlab2tikz/*' -not -path './common/lua-filters'  -not -path './exams/*' -name '*Makefile'))
 $(info $$submakefiles is [${submakefiles}])
 index_see_entries = ./scripts/index-see-entries.tex
 ifdef h
@@ -321,7 +321,7 @@ sample:
 # ==========================
 
 EXAMS_DIR ?= exams
-EXAM_WRAPPER ?= $(EXAMS_DIR)/exam-gen.sh
+EXAM_WRAPPER ?= scripts/exam-gen.sh
 
 # Top-level "exams" target: show quick help
 exams:

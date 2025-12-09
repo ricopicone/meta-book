@@ -179,6 +179,9 @@ class ExamGenerator:
 \usepackage{enumerate}
 \usepackage{enumitem}
 \usepackage{xparse}  % For NewDocumentCommand used in simplified macros
+<<BIBLATEX_PACKAGE>>
+\usepackage{hyperref}  % For href links
+\usepackage[draft=false,newfloat]{minted}  % For code highlighting
 
 % Essential packages for figures and subfigures
 \usepackage{graphicx}
@@ -197,6 +200,31 @@ class ExamGenerator:
 % Import book style files directly
 \usepackage{<<STYLES_PATH>>/bookmathmacros}
 \usepackage{<<STYLES_PATH>>/booktikz}
+
+% Minted configuration for code highlighting
+\setminted{
+  usepygments=true,
+  linenos=false,
+  breaklines=true,
+  frame=none,
+  framesep=1mm,
+  fontsize=\small,
+  bgcolor=white,
+  parskip=0pt
+}
+
+% Reduce spacing around minted environments
+\BeforeBeginEnvironment{minted}{\vspace{-1em}}
+\AfterEndEnvironment{minted}{\vspace{-2em}}
+
+% Language-specific minted settings for text: left frame with indentation
+\setminted[text]{
+  frame=leftline,
+  rulecolor=gray,
+  framerule=2pt,
+  xleftmargin=10pt,
+  parskip=0pt
+}
 
 % Simplified version of book macros for exams
 % These override complex book macros that have dependencies we don't need in exams
@@ -312,6 +340,14 @@ class ExamGenerator:
         """Generate a complete exam LaTeX file."""
         # Replace template variables
         header = self.template_header
+        
+        # Handle bibliography
+        bib_file = config.get('bibliography')
+        if bib_file:
+            biblatex_package = f"\\usepackage[backend=biber,style=numeric,sorting=none,natbib=true]{{biblatex}}\n\\addbibresource{{{bib_file}}}"
+        else:
+            biblatex_package = ""
+        
         replacements = {
             '<<EXAM_TITLE>>': config.get('title', 'Exam'),
             '<<EXAM_DATE>>': config.get('date', datetime.now().strftime('%B %d, %Y')),
@@ -319,7 +355,8 @@ class ExamGenerator:
             '<<INSTRUCTOR_NAME>>': config.get('instructor', 'Instructor'),
             '<<EXAM_VERSION>>': config.get('version', 'A'),
             '<<EXAM_INSTRUCTIONS>>': config.get('instructions', 'Show all work for full credit. Clearly indicate your final answers. Use appropriate units in your calculations.'),
-            '<<STYLES_PATH>>': self.styles_path
+            '<<STYLES_PATH>>': self.styles_path,
+            '<<BIBLATEX_PACKAGE>>': biblatex_package
         }
         if config.get('time_limit'):
             replacements['<<EXAM_TIME>>'] = ' --- ' + config['time_limit']
@@ -332,8 +369,13 @@ class ExamGenerator:
         # Generate problems section
         problems_section = self._generate_problems(config['problems'],
                                                  config.get('include_solutions', False))
+        
+        # Generate footer with optional bibliography
+        footer = self.template_footer
+        if config.get('bibliography'):
+            footer = "\n\n\\printbibliography\n" + footer
 
-        return header + problems_section + self.template_footer
+        return header + problems_section + footer
 
     def _generate_problems(self, problem_specs: List, include_solutions: bool = False) -> str:
         """Generate the problems section of the exam."""
@@ -415,6 +457,7 @@ def create_sample_config():
         'instructor': 'Dr. Smith',
         'version': 'A',
         'include_solutions': False,
+        'bibliography': None,  # Optional: path to .bib file (e.g., 'references.bib')
         'instructions': 'Show all work for full credit. Clearly indicate your final answers. Use appropriate units in your calculations. Partial credit will be given for correct methodology.',
         'problems': [
             {'id': 'exercise1', 'points': 20, 'instructions': 'Show all work clearly.'},
@@ -485,15 +528,32 @@ def compile_pdf(tex_file: str, base_path: str = "..") -> bool:
 
         # Prefer latexmk
         if latexmk_cmd:
-            cmd = [latexmk_cmd, '-pdf', '-f', '-interaction=batchmode', tex_path.name]
+            cmd = [latexmk_cmd, '-pdf', '-f', '-interaction=batchmode', '-shell-escape', tex_path.name]
             result = subprocess.run(cmd, capture_output=True, text=True, cwd=book_dir)
         elif pdflatex_cmd:
-            # Fallback to pdflatex (run twice for refs)
-            cmd1 = [pdflatex_cmd, '-interaction=batchmode', tex_path.name]
+            # Fallback to pdflatex - need to run biber if bibliography is present
+            biber_cmd = (
+                os.environ.get('BIBER')
+                or shutil.which('biber')
+                or (str(Path('/Library/TeX/texbin/biber')) if Path('/Library/TeX/texbin/biber').exists() else None)
+            )
+            
+            cmd1 = [pdflatex_cmd, '-interaction=batchmode', '-shell-escape', tex_path.name]
             r1 = subprocess.run(cmd1, capture_output=True, text=True, cwd=book_dir)
+            
+            # Check if .bcf file was created (indicates biblatex is used)
+            bcf_file = book_dir / tex_path.with_suffix('.bcf').name
+            if bcf_file.exists() and biber_cmd:
+                # Run biber for bibliography processing
+                biber_result = subprocess.run(
+                    [biber_cmd, tex_path.stem],
+                    capture_output=True, text=True, cwd=book_dir
+                )
+            
             r2 = subprocess.run(cmd1, capture_output=True, text=True, cwd=book_dir)
+            r3 = subprocess.run(cmd1, capture_output=True, text=True, cwd=book_dir)  # Third run to resolve citations
             # Combine outputs for diagnostics
-            result = r2
+            result = r3
         else:
             print("No LaTeX toolchain found (latexmk or pdflatex). Skipping PDF compilation.")
             print("To enable PDF compilation on macOS:")
