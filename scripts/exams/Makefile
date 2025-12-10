@@ -19,7 +19,7 @@
 
 # Default settings
 PYTHON = python3
-EXAM_GENERATOR = generate_exam.py
+EXAM_GENERATOR = ../meta-book/scripts/exams/generate_exam.py
 LATEX = pdflatex
 BIBTEX = bibtex
 MAKEINDEX = makeindex

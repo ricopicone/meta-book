@@ -168,6 +168,21 @@ class ExamGenerator:
         self.template_header = self._get_template_header()
         self.template_footer = self._get_template_footer()
 
+    def _find_book_aux(self, compile_root: Path) -> Optional[str]:
+        """Locate a main book .aux file and return a path relative to the compile root."""
+        candidates = ["systems-0.aux", "systems.aux", "main.aux"]
+        # Search upwards from compile root and also in systems/ under each parent
+        search_dirs = [compile_root.resolve()] + list(compile_root.resolve().parents)
+        for d in search_dirs:
+            for name in candidates:
+                for candidate in (d / name, d / "systems" / name):
+                    if candidate.exists():
+                        try:
+                            return os.path.relpath(candidate.resolve(), compile_root.resolve())
+                        except Exception:
+                            return str(candidate)
+        return None
+
     def _get_template_header(self) -> str:
         """Get the LaTeX header template."""
         return r"""\documentclass[11pt,letterpaper]{article}
@@ -179,8 +194,11 @@ class ExamGenerator:
 \usepackage{enumerate}
 \usepackage{enumitem}
 \usepackage{xparse}  % For NewDocumentCommand used in simplified macros
+\usepackage{standalone}  % For includestandalone figures
 <<BIBLATEX_PACKAGE>>
+\usepackage{xr}        % For external references to main book
 \usepackage{hyperref}  % For href links
+<<XR_EXTERNAL>>
 \usepackage[draft=false,newfloat]{minted}  % For code highlighting
 
 % Essential packages for figures and subfigures
@@ -338,9 +356,21 @@ class ExamGenerator:
 
     def generate_exam(self, config: Dict) -> str:
         """Generate a complete exam LaTeX file."""
-        # Replace template variables
-        header = self.template_header
-        
+        # Determine output directory early so we can compute relpaths
+        if config.get('output_dir'):
+            output_dir = Path(config['output_dir'])
+        elif config.get('config_path'):
+            output_dir = Path(config['config_path']).parent
+        else:
+            output_dir = Path('.')
+
+        # XR external document linking (relative to compile root/base path)
+        compile_root = Path(config.get('base_path_resolved', self.extractor.base_path)).resolve()
+        aux_rel = self._find_book_aux(compile_root)
+        if aux_rel and aux_rel.endswith('.aux'):
+            aux_rel = aux_rel[:-4]
+        xr_external = f"\\externaldocument{{{aux_rel}}}" if aux_rel else ''
+
         # Handle bibliography
         bib_file = config.get('bibliography')
         if bib_file:
@@ -356,13 +386,16 @@ class ExamGenerator:
             '<<EXAM_VERSION>>': config.get('version', 'A'),
             '<<EXAM_INSTRUCTIONS>>': config.get('instructions', 'Show all work for full credit. Clearly indicate your final answers. Use appropriate units in your calculations.'),
             '<<STYLES_PATH>>': self.styles_path,
-            '<<BIBLATEX_PACKAGE>>': biblatex_package
+            '<<BIBLATEX_PACKAGE>>': biblatex_package,
+            '<<XR_EXTERNAL>>': xr_external
         }
         if config.get('time_limit'):
             replacements['<<EXAM_TIME>>'] = ' --- ' + config['time_limit']
         else:
             replacements['<<EXAM_TIME>>'] = ''
 
+        # Replace template variables
+        header = self.template_header
         for placeholder, value in replacements.items():
             header = header.replace(placeholder, value)
 
@@ -404,11 +437,15 @@ class ExamGenerator:
                 continue
 
             # Start the problem with inline formatting
-            problems_latex += f"\n\\stepcounter{{problem}}\n"
+            problems_latex += f"\n\\refstepcounter{{problem}}\n"
             problems_latex += f"\\noindent\\textbf{{Problem \\theproblem"
             if points:
                 problems_latex += f"~({points} points)"
-            problems_latex += ".} "
+            problems_latex += ".}"
+            # Add a label using the exercise hash so references work
+            if exercise.get('hash'):
+                problems_latex += f"\\label{{{exercise['hash']}}}"
+            problems_latex += " "
 
             # Add custom instructions if provided
             if custom_instructions:
@@ -605,8 +642,8 @@ def main():
     parser.add_argument('--solutions', action='store_true', help='Include solutions')
     parser.add_argument('--list', action='store_true', help='List available exercises')
     parser.add_argument('--sample-config', action='store_true', help='Create sample config file')
-    parser.add_argument('--base-path', default='..', help='Base path to exercise files')
-    parser.add_argument('--exercise-pattern', default='ch*_exercises.tex', 
+    parser.add_argument('--base-path', default=os.environ.get('BASE_PATH','../..'), help='Base path to exercise files')
+    parser.add_argument('--exercise-pattern', default=os.environ.get('EXERCISE_PATTERN','ch*_exercises.tex'), 
                        help='Glob pattern(s) for exercise files (comma-separated for multiple patterns)')
     parser.add_argument('--styles-path', default='common/styles-tex', help='Path to book style files (relative to book root)')
     parser.add_argument('--no-quick', action='store_true', help='Skip PDF compilation (default: compile PDF)')
@@ -619,7 +656,7 @@ def main():
         return
 
     # Initialize extractor
-    extractor = ExerciseExtractor(args.base_path, args.exercise_pattern)
+    extractor = ExerciseExtractor(Path(args.base_path).resolve(), args.exercise_pattern)
 
     if args.list:
         list_available_exercises(extractor)
@@ -632,8 +669,10 @@ def main():
         # Load from config file
         config = load_config(args.config)
         # Determine base name from config file
-        config_path = Path(args.config)
+        config_path = Path(args.config).resolve()
         base_name = config_path.stem
+        config['config_path'] = str(config_path)
+        config['base_path_resolved'] = str(extractor.base_path)
     elif args.problems:
         # Create config from command line arguments
         problem_list = [p.strip() for p in args.problems.split(',')]
@@ -664,10 +703,18 @@ def main():
     # If a config file was provided and no explicit directory was given,
     # write outputs next to the config file for convenience
     if args.config:
-        output_dir = Path(args.config).parent
-        output_file = str(output_dir / f"{base_name}.tex")
+        output_dir = Path(config['config_path']).parent
+        if config.get('output_dir'):
+            output_dir = Path(config['output_dir']).resolve()
+        output_file = str((output_dir / f"{base_name}.tex").resolve())
     else:
-        output_file = f"{base_name}.tex"
+        # Respect output_dir in config if provided
+        if config.get('output_dir'):
+            output_dir = Path(config['output_dir']).resolve()
+            output_file = str(output_dir / f"{base_name}.tex")
+        else:
+            output_dir = Path('.').resolve()
+            output_file = str(output_dir / f"{base_name}.tex")
 
     # Write the exam file
     with open(output_file, 'w', encoding='utf-8') as f:
