@@ -201,6 +201,10 @@ class ExamGenerator:
 <<XR_EXTERNAL>>
 \usepackage[draft=false,newfloat]{minted}  % For code highlighting
 
+% Tables
+\usepackage{booktabs}
+\usepackage{tabularx}
+
 % Essential packages for figures and subfigures
 \usepackage{graphicx}
 \graphicspath{{.},{./figures},{./common},{./common/figures},{../common},{../common/figures}}

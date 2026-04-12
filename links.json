@@ -15,7 +15,8 @@
         "../Makefile": "Makefile",
     "../new-versionless-text.py": "new-versionless-text.py",
     "../requirements.txt": "requirements.txt",
-    "../exams/exam-gen.sh": "scripts/exams/exam-gen.sh"
+    "../exams/exam-gen.sh": "scripts/exams/exam-gen.sh",
+    "../psets/pset-gen.sh": "scripts/pset-gen.sh"
     },
     "directories":{
         "../scripts": "scripts"
