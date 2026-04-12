@@ -619,12 +619,30 @@ def compile_pdf(tex_file: str, base_path: str = "..") -> bool:
                 # If resolve fails for dest (doesn't exist yet), just copy
                 shutil.copy2(pdf_file, dest_pdf)
             print(f"PDF compiled successfully: {dest_pdf}")
-            return True
+            compile_ok = True
         else:
             print("PDF compilation did not produce an output file.")
             if result and getattr(result, 'stderr', None):
                 print("LaTeX errors:", result.stderr[-500:])
-            return False
+            compile_ok = False
+
+        # Clean up build artifacts from book_dir (the .tex was copied there for compilation)
+        stem = tex_path.stem
+        for ext in ('.tex', '.aux', '.log', '.out', '.bcf', '.bbl', '.blg',
+                     '.fls', '.fdb_latexmk', '.run.xml', '.synctex.gz',
+                     '.pdf', '.toc', '.nav', '.snm'):
+            artifact = book_dir / f"{stem}{ext}"
+            if artifact.exists():
+                try:
+                    artifact.unlink()
+                except Exception:
+                    pass
+        # Also clean minted cache directory if present
+        minted_dir = book_dir / f"_minted-{stem}"
+        if minted_dir.is_dir():
+            shutil.rmtree(minted_dir, ignore_errors=True)
+
+        return compile_ok
 
     except Exception as e:
         print(f"Error during PDF compilation: {e}")
