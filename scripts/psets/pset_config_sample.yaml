@@ -1,0 +1,14 @@
+bibliography: null
+course: Course Name
+date: March 15, 2026
+instructor: Dr. Smith
+problems:
+- id: exercise1
+  points: 20
+- id: exercise2
+  page_break: true
+  points: 25
+- exercise3
+- id: exercise4
+  points: 30
+title: Problem Set 1 Solutions
