@@ -28,6 +28,7 @@ cd "$SCRIPT_DIR"
 # Configuration
 PYTHON=${PYTHON:-python3}
 EXAM_GENERATOR="generate_exam.py"
+DEPS_REBUILDER="rebuild_deps.py"
 LATEX=${LATEX:-pdflatex}
 
 # Default paths (can be overridden)
@@ -147,12 +148,38 @@ create_sample_config() {
     print_success "Sample configuration created: exam_config_sample.yaml"
 }
 
+# Rebuild the specific versioned index.tex files that the requested problems
+# live in, using source-dependencies.json to map problem IDs -> versioned files.
+# This runs `make` on just those targets (from the book root) so problem-source
+# edits propagate into the exam without requiring a full-book rebuild.
+# Failures here are fatal: a stale versioned file would silently produce a
+# stale exam, which is worse than aborting.
+rebuild_dependencies_for_problems() {
+    local problems="$1"
+    if [[ ! -f "$DEPS_REBUILDER" ]]; then
+        return 0
+    fi
+    print_info "Rebuilding versioned index.tex files for: $problems"
+    "$PYTHON" "$DEPS_REBUILDER" --problems "$problems" --base-path "$BASE_PATH"
+}
+
+rebuild_dependencies_for_config() {
+    local config_file="$1"
+    if [[ ! -f "$DEPS_REBUILDER" ]]; then
+        return 0
+    fi
+    print_info "Rebuilding versioned index.tex files for: $config_file"
+    "$PYTHON" "$DEPS_REBUILDER" --config "$config_file" --base-path "$BASE_PATH"
+}
+
 # Generate exam from problems list
 generate_exam_from_problems() {
     local problems="$1"
     local no_quick="$2"
     shift 2
-    
+
+    rebuild_dependencies_for_problems "$problems"
+
     print_info "Generating exam with problems: $problems"
     
     # Build command with optional parameters
@@ -217,7 +244,9 @@ generate_exam_from_config() {
         print_error "Configuration file not found: $config_file"
         exit 1
     fi
-    
+
+    rebuild_dependencies_for_config "$config_file"
+
     print_info "Generating exam from configuration: $config_file"
     
     local cmd=("$PYTHON" "$EXAM_GENERATOR" "--config" "$config_file" "--base-path" "$BASE_PATH" "--exercise-pattern" "$EXERCISE_PATTERN" "--styles-path" "$STYLES_PATH")
