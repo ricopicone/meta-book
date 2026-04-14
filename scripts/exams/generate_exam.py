@@ -201,6 +201,13 @@ class ExamGenerator:
 <<XR_EXTERNAL>>
 \usepackage[draft=false,newfloat]{minted}  % For code highlighting
 
+% Unicode character support: the exam is compiled with pdflatex, which
+% doesn't natively handle raw UTF-8 inside math mode. Declare characters
+% we use (e.g., the degree symbol °) so they render correctly in both
+% text and math mode.
+\usepackage{textcomp}
+\DeclareUnicodeCharacter{00B0}{\ensuremath{^\circ}}
+
 % Tables
 \usepackage{booktabs}
 \usepackage{tabularx}
@@ -288,9 +295,20 @@ class ExamGenerator:
 \NewDocumentEnvironment{mintedwrapper}{}{}{}
 \NewDocumentEnvironment{formattedoutput}{}{}{}
 
+% \tightlist: pandoc emits this inside lists it detects as "tight" (no
+% blank lines between items). The book no-ops it on purpose; for the
+% exam we want it to actually collapse the extra vertical space between
+% items, so we use pandoc's standard definition.
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
 % Set default enumerate labels to lowercase alphabetical
 \setlist[enumerate,1]{label=\alph*.}
 \setlist[enumerate,2]{label=\roman*.}
+% Apply tight-list spacing to all lists (enumerate, itemize, description),
+% whether pandoc classifies them as tight or loose. This matches the
+% effect of pandoc's \tightlist but applies unconditionally.
+\setlist{itemsep=0pt, parsep=0pt}
 
 % Simple counter for problems
 \newcounter{problem}
