@@ -207,7 +207,13 @@ class ExamGenerator:
 
 % Essential packages for figures and subfigures
 \usepackage{graphicx}
-\graphicspath{{.},{./figures},{./common},{./common/figures},{../common},{../common/figures}}
+\graphicspath{{.},{./figures},{./common},{./common/figures},{../},{../common},{../common/figures}}
+% Search path for \input (used by \inputpgf) — include project root so
+% relative paths like source/xxx/figure-0.pgf resolve when compiled from
+% the exams/ subdirectory.
+\makeatletter
+\def\input@path{{./}{../}}
+\makeatother
 \usepackage[margin=.5ex]{subcaption}
 \usepackage{float}
 \usepackage[all]{hypcap}
@@ -223,29 +229,28 @@ class ExamGenerator:
 \usepackage{<<STYLES_PATH>>/bookmathmacros}
 \usepackage{<<STYLES_PATH>>/booktikz}
 
-% Minted configuration for code highlighting
+% Minted configuration for code highlighting (matches book style in
+% common/styles-tex/environments.sty so code cells have balanced
+% spacing matching inline prose).
 \setminted{
-  usepygments=true,
-  linenos=false,
-  breaklines=true,
-  frame=none,
-  framesep=1mm,
+  autogobble,
   fontsize=\small,
-  bgcolor=white,
-  parskip=0pt
-}
-
-% Reduce spacing around minted environments
-\BeforeBeginEnvironment{minted}{\vspace{-1em}}
-\AfterEndEnvironment{minted}{\vspace{-2em}}
-
-% Language-specific minted settings for text: left frame with indentation
-\setminted[text]{
   frame=leftline,
-  rulecolor=gray,
-  framerule=2pt,
-  xleftmargin=10pt,
-  parskip=0pt
+  framerule=1pt,
+  rulecolor=\color{gray},
+  framesep=4pt,
+  tabsize=2,
+  breaklines=true
+}
+\setminted[text]{
+  autogobble,
+  fontsize=\small,
+  frame=leftline,
+  framerule=1pt,
+  rulecolor=\color{gray!50},
+  framesep=4pt,
+  xleftmargin=\parindent,
+  breaklines=true
 }
 
 % Simplified version of book macros for exams
@@ -271,6 +276,17 @@ class ExamGenerator:
 
 % Define graphicslist as empty (used by book's figcaption)
 \def\graphicslist{}
+
+% Input matplotlib-generated PGF figures (used by publish tool output)
+\newcommand{\inputpgf}[1]{%
+  \begin{tikzpicture}%
+    \node[inner sep=0pt] {\input{#1}};%
+  \end{tikzpicture}%
+}
+
+% Pass-through environments used by publish tool output
+\NewDocumentEnvironment{mintedwrapper}{}{}{}
+\NewDocumentEnvironment{formattedoutput}{}{}{}
 
 % Set default enumerate labels to lowercase alphabetical
 \setlist[enumerate,1]{label=\alph*.}
